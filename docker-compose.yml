@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  qdrant:
+    image: qdrant/qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - rag-network
+
+  ollama:
+    image: ollama/ollama
+    entrypoint: ollama serve
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    tty: true
+    networks:
+      rag-network:
+        aliases:
+          - ollama
+
+  rag-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - qdrant
+      - ollama
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    environment:
+      - QDRANT_HOST=qdrant # 明確設置 QDRANT_HOST
+      - OLLAMA_HOST=ollama
+    networks:
+      rag-network:
+        aliases:
+          - ollama
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  qdrant_data:
+    external: false
+  ollama_data:
+    external: false
